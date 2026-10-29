@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HandSpace</title>
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "@mediapipe/tasks-vision": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs"
+      }
+    }
+  </script>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <div id="hud">
+    <h1>HandSpace</h1>
+    <div id="status">Press “Start camera”</div>
+    <div id="stats"></div>
+    <ul class="keys">
+      <li><kbd>Pinch</kbd> grab · twist to rotate · release to drop / throw</li>
+      <li><kbd>H</kbd> head tracking: <span id="headState">on</span></li>
+      <li><kbd>C</kbd> recenter head</li>
+      <li><kbd>V</kbd> camera preview</li>
+      <li><kbd>Space</kbd> spawn shape · <kbd>R</kbd> reset</li>
+    </ul>
+  </div>
+
+  <div id="pip">
+    <video id="video" playsinline muted></video>
+    <canvas id="overlay"></canvas>
+  </div>
+
+  <div id="start">
+    <div class="card">
+      <h2>HandSpace</h2>
+      <p>Webcam hand + head tracking in a 3D room.</p>
+      <p><b>Pinch</b> your thumb and index finger near a shape to pick it up. Move your hand closer or further from the camera to reach deeper into the room. <b>Move your head</b> to look around the room, as if the screen were a window.</p>
+      <button id="startBtn">Start camera</button>
+      <p class="small">All tracking runs locally in your browser. No video leaves your machine.</p>
+    </div>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
