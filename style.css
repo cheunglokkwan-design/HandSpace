@@ -14,6 +14,31 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0d12; col
 kbd { display: inline-block; padding: 0 5px; border: 1px solid #3a4660; border-bottom-width: 2px;
   border-radius: 4px; background: #182030; font: 11.5px ui-monospace, monospace; color: #e6e9f0; }
 
+#tabs { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; gap: 4px;
+  padding: 4px; background: rgba(12, 15, 22, 0.8); border: 1px solid #263044; border-radius: 10px; backdrop-filter: blur(6px); }
+#tabs .tab { margin: 0; padding: 7px 16px; font-size: 13.5px; font-weight: 600; color: #aab4c8; background: transparent;
+  border-radius: 7px; }
+#tabs .tab:hover { background: #182030; color: #e6e9f0; }
+#tabs .tab.active { background: #4cc9f0; color: #0b0d12; }
+
+#score { margin-top: 6px; color: #e6e9f0; font-variant-numeric: tabular-nums; }
+#score b { color: #ffd166; }
+[hidden] { display: none !important; }
+
+#pop { position: fixed; top: 22%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none;
+  opacity: 0; z-index: 5; text-shadow: 0 4px 20px rgba(0, 0, 0, 0.6); }
+#pop .big { font-size: 56px; font-weight: 800; color: #ffd166; line-height: 1; }
+#pop .sub { margin-top: 6px; font-size: 15px; color: #e6e9f0; }
+#pop.show { animation: pop 0.9s ease-out forwards; }
+@keyframes pop {
+  0% { opacity: 0; transform: translate(-50%, -30%) scale(0.7); }
+  15% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+  70% { opacity: 1; transform: translate(-50%, -55%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -70%) scale(1); }
+}
+
+@media (max-width: 640px) { #tabs { top: auto; bottom: 16px; } }
+
 #pip { position: fixed; right: 16px; bottom: 16px; width: 260px; aspect-ratio: 16 / 9;
   border-radius: 10px; overflow: hidden; border: 1px solid #263044; background: #000; }
 #pip.hidden { display: none; }

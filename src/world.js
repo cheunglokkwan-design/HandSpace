@@ -202,6 +202,24 @@ export class World {
     });
   }
 
+  /** Take the current shapes out of the scene (kept as-is) and return them. */
+  stashObjects() {
+    const saved = this.objects;
+    for (const o of saved) this.scene.remove(o.mesh);
+    this.objects = [];
+    return saved;
+  }
+
+  /** Put previously stashed shapes back exactly where they were. */
+  restoreObjects(saved) {
+    for (const o of [...this.objects]) this.remove(o);
+    for (const o of saved) {
+      this.scene.add(o.mesh);
+      this.keepInside(o);
+    }
+    this.objects = saved;
+  }
+
   keepInside(o) {
     const p = o.mesh.position;
     p.x = THREE.MathUtils.clamp(p.x, -this.hw + o.r, this.hw - o.r);
@@ -327,10 +345,12 @@ export class World {
     const tmp = new THREE.Vector3();
     const world = this;
     return {
+      showCursor: true, // the pinch ring (hidden in the Boxing tab)
       setVisible(v) {
         group.visible = blob.visible = v;
       },
       update(points, cursorPos, pinching) {
+        cursor.visible = this.showCursor;
         points.forEach((p, i) => joints[i].position.copy(p));
         HAND_CONNECTIONS.forEach(([a, b], k) => {
           const bone = bones[k];

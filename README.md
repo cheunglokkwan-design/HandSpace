@@ -2,6 +2,15 @@
 
 A browser experiment in webcam-only spatial interaction. Your **hands** become a 3D skeleton inside a virtual room, where you can pick up, rotate and throw shapes. Your **head position** drives a head-coupled perspective: the screen behaves like a window, and the room shifts as you move. Everything runs locally with your webcam. No headset and no extra hardware.
 
+## Tabs
+
+The app has two tabs at the top of the screen. Click them, or press `1` and `2`. Open `/#boxing` to start straight in the Boxing tab.
+
+- **Playground**: the original room. Pinch to grab, rotate and throw shapes. Your shapes stay where you left them while you switch tabs.
+- **Boxing**: a heavy bag hangs from the ceiling. Punch towards the screen to hit it, and it swings. A yellow focus mitt pops up around the room for a +50 bonus. Your hands wear gloves, and a closed fist scores 1.5×. Hits less than 1.4 s apart build a combo of up to 2×. Score, hits and best power are shown in the HUD, and `R` resets them.
+
+In the Boxing tab the depth is reversed: moving your hand **towards** the camera pushes the glove **into** the room, so a real punch lands on the bag. In the Playground you reach in by pulling your hand back.
+
 ## Features
 
 - **Hand tracking (up to 2 hands)**: MediaPipe Hand Landmarker, 21 joints per hand, rendered as a 3D skeleton that casts shadows.
@@ -32,8 +41,9 @@ Then open http://localhost:8000 and press **Start camera**. Use Chrome or Edge f
 | `H` | Toggle head tracking |
 | `C` | Recenter head (sit where you want "neutral", then press) |
 | `V` | Toggle camera preview with landmark overlay |
-| `Space` | Spawn a random shape |
-| `R` | Reset the room |
+| `Space` | Spawn a random shape (Playground) |
+| `R` | Reset the room (Playground) / reset the score (Boxing) |
+| `1` / `2` | Switch to Playground / Boxing |
 
 ## How it works
 
@@ -44,7 +54,9 @@ webcam ──► MediaPipe HandLandmarker ──► 21 landmarks/hand ──► 
 
 - `src/tracking.js` handles the webcam and MediaPipe tasks: hands and face, VIDEO mode, GPU with CPU fallback.
 - `src/world.js` contains the three.js room, shapes, simple sphere physics, hand visuals and the head-coupled camera.
-- `src/main.js` maps landmarks to world space, runs the pinch state machine and grab logic, and handles input.
+- `src/main.js` maps landmarks to world space, runs the pinch state machine and grab logic, handles input and switches tabs.
+- `src/boxing.js` contains the Boxing tab: the heavy bag, the focus mitt, the gloves and the scoring.
+- `src/boxingLogic.js` holds the boxing maths with no three.js dependency (fist detection, punch power, bag pendulum, hit tests), so it can be tested in Node.
 
 **Head-coupled camera.** The screen is a fixed rectangle at `z = 0` and the eye sits at `(ex, ey, ez)`. Each frame, the projection is an asymmetric frustum through that rectangle:
 `left = (-w/2 - ex)·near/ez`, `right = (w/2 - ex)·near/ez`, and the same for top and bottom.
