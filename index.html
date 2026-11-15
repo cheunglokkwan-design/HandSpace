@@ -17,18 +17,35 @@
 <body>
   <canvas id="scene"></canvas>
 
+  <nav id="tabs" role="tablist" aria-label="Modes">
+    <button class="tab active" role="tab" aria-selected="true" data-mode="playground">Playground</button>
+    <button class="tab" role="tab" aria-selected="false" data-mode="boxing">Boxing</button>
+  </nav>
+
   <div id="hud">
     <h1>HandSpace</h1>
     <div id="status">Press “Start camera”</div>
     <div id="stats"></div>
-    <ul class="keys">
+    <div id="score" data-mode="boxing" hidden></div>
+    <ul class="keys" data-mode="playground">
       <li><kbd>Pinch</kbd> grab · twist to rotate · release to drop / throw</li>
-      <li><kbd>H</kbd> head tracking: <span id="headState">on</span></li>
+      <li><kbd>H</kbd> head tracking: <span class="headState">on</span></li>
       <li><kbd>C</kbd> recenter head</li>
       <li><kbd>V</kbd> camera preview</li>
       <li><kbd>Space</kbd> spawn shape · <kbd>R</kbd> reset</li>
+      <li><kbd>1</kbd> <kbd>2</kbd> switch tab</li>
+    </ul>
+    <ul class="keys" data-mode="boxing" hidden>
+      <li><kbd>Punch</kbd> towards the screen to hit the bag</li>
+      <li><kbd>Fist</kbd> closed fist scores 1.5× · fast combos stack</li>
+      <li><kbd>Mitt</kbd> hit the yellow pad for +50</li>
+      <li><kbd>H</kbd> head tracking: <span class="headState">on</span> · <kbd>C</kbd> recenter</li>
+      <li><kbd>V</kbd> camera preview · <kbd>R</kbd> reset score</li>
+      <li><kbd>1</kbd> <kbd>2</kbd> switch tab</li>
     </ul>
   </div>
+
+  <div id="pop" aria-live="polite"></div>
 
   <div id="pip">
     <video id="video" playsinline muted></video>
@@ -39,7 +56,9 @@
     <div class="card">
       <h2>HandSpace</h2>
       <p>Webcam hand + head tracking in a 3D room.</p>
-      <p><b>Pinch</b> your thumb and index finger near a shape to pick it up. Move your hand closer or further from the camera to reach deeper into the room. <b>Move your head</b> to look around the room, as if the screen were a window.</p>
+      <p><b>Playground:</b> pinch your thumb and index finger near a shape to pick it up. Move your hand closer or further from the camera to reach deeper into the room.</p>
+      <p><b>Boxing:</b> punch towards the screen to hit the heavy bag and the yellow mitt.</p>
+      <p><b>Move your head</b> to look around the room, as if the screen were a window. Switch modes with the tabs at the top.</p>
       <button id="startBtn">Start camera</button>
       <p class="small">All tracking runs locally in your browser. No video leaves your machine.</p>
     </div>

@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import { createTracker } from "./tracking.js";
 import { World, SCREEN_W, ROOM_D, HAND_CONNECTIONS } from "./world.js";
+import { BoxingMode } from "./boxing.js";
+import { isFist } from "./boxingLogic.js";
 
 // ---------------- tuning ----------------
 const CONFIG = {
@@ -40,7 +42,15 @@ const lerp = THREE.MathUtils.lerp;
 class HandSlot {
   constructor(label, color) {
     this.label = label;
+    this.color = color;
     this.vis = world.createHandVisual(color);
+    // Palm centre (knuckles) + velocity, and fist state: used by the Boxing tab.
+    this.palmPos = new THREE.Vector3();
+    this.prevPalm = new THREE.Vector3();
+    this.palmVel = new THREE.Vector3();
+    this.fist = false;
+    this.inBag = false;
+    this.boxCooldown = 0;
     this.joints = Array.from({ length: 21 }, () => new THREE.Vector3());
     this.active = false;
     this.lostFor = 0;
@@ -58,6 +68,55 @@ class HandSlot {
 // MediaPipe labels handedness assuming a mirrored (selfie) image. Our feed isn't mirrored,
 // so its "Left" is your right hand. Keys follow MediaPipe; labels are what you see.
 const slots = { Left: new HandSlot("right hand", 0x4cc9f0), Right: new HandSlot("left hand", 0xf15bb5) };
+
+// ---------------- tabs / modes ----------------
+// "playground": the original grab-and-throw room. "boxing": heavy bag + focus mitt.
+const MODES = ["playground", "boxing"];
+let mode = "playground";
+let savedShapes = null; // Playground shapes kept aside while you box
+
+const popEl = $("pop");
+let popTimer = 0;
+const boxing = new BoxingMode(world, {
+  onStats({ score, hits, best, combo }) {
+    $("score").innerHTML =
+      `<b>${score}</b> pts · ${hits} hits · best power ${best}` + (combo > 1 ? ` · <b>${combo}× combo</b>` : "");
+  },
+  onPop(text, sub) {
+    popEl.innerHTML = `<div class="big">${text}</div><div class="sub">${sub}</div>`;
+    popEl.classList.remove("show");
+    void popEl.offsetWidth; // restart the animation
+    popEl.classList.add("show");
+    clearTimeout(popTimer);
+    popTimer = setTimeout(() => popEl.classList.remove("show"), 900);
+  },
+});
+
+function setMode(next) {
+  if (!MODES.includes(next) || next === mode) return;
+  if (mode === "playground") {
+    for (const s of Object.values(slots)) release(s, false);
+    savedShapes = world.stashObjects();
+  } else {
+    boxing.exit();
+  }
+  mode = next;
+  if (mode === "playground") {
+    if (savedShapes) world.restoreObjects(savedShapes);
+    savedShapes = null;
+  } else {
+    boxing.enter();
+  }
+  for (const s of Object.values(slots)) s.vis.showCursor = mode === "playground";
+  document.querySelectorAll("#tabs .tab").forEach((b) => {
+    const on = b.dataset.mode === mode;
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-selected", on);
+  });
+  document.querySelectorAll("#hud [data-mode]").forEach((el) => (el.hidden = el.dataset.mode !== mode));
+  history.replaceState(null, "", mode === "playground" ? location.pathname : `#${mode}`);
+  if (tracker) setStatus(mode === "boxing" ? "Punch towards the screen to hit the bag." : "Pinch near a shape to grab it.");
+}
 
 // ---------------- state ----------------
 let tracker = null;
@@ -92,10 +151,11 @@ const tmpV = new THREE.Vector3();
 const tmpQ = new THREE.Quaternion();
 const basis = { x: new THREE.Vector3(), y: new THREE.Vector3(), z: new THREE.Vector3(), m: new THREE.Matrix4() };
 
-function landmarkToWorld(l, baseZ, va, out) {
+function landmarkToWorld(l, baseZ, va, out, zSign = 1) {
   const s = SCREEN_W * CONFIG.handGain;
   // x mirrored so your hand moves like in a mirror; y in the same units as x (no distortion).
-  return out.set((0.5 - l.x) * s, ((CONFIG.handCenterY - l.y) * s) / va, baseZ - l.z * s);
+  // zSign flips per-joint depth in the Boxing tab, where "towards the camera" means "into the room".
+  return out.set((0.5 - l.x) * s, ((CONFIG.handCenterY - l.y) * s) / va, baseZ - zSign * l.z * s);
 }
 
 function handOrientation(j, out) {
@@ -113,10 +173,26 @@ function processHand(slot, lm, dt) {
   // Hand depth from apparent palm size (wrist → middle-finger knuckle), aspect-corrected to frame-height units.
   const palm = Math.hypot((lm[0].x - lm[9].x) * va, lm[0].y - lm[9].y);
   const t = clamp((palm - CONFIG.palmFar) / (CONFIG.palmNear - CONFIG.palmFar), 0, 1);
-  const baseZ = lerp(-ROOM_D + 2, 1, t);
+  // Playground: hand closer to the camera = front of the room (reach in by pulling back).
+  // Boxing: hand closer to the camera = deeper into the room, so punching at the screen hits the bag.
+  const boxingMode = mode === "boxing";
+  const baseZ = boxingMode ? boxing.depth(t) : lerp(-ROOM_D + 2, 1, t);
 
   const a = slot.active ? CONFIG.handSmoothing : 1;
-  lm.forEach((l, i) => slot.joints[i].lerp(landmarkToWorld(l, baseZ, va, tmpV), a));
+  lm.forEach((l, i) => slot.joints[i].lerp(landmarkToWorld(l, baseZ, va, tmpV, boxingMode ? -1 : 1), a));
+
+  // Palm centre (average of the four knuckles) + its velocity, and whether the hand is a fist.
+  slot.prevPalm.copy(slot.palmPos);
+  slot.palmPos.set(0, 0, 0);
+  for (const k of [5, 9, 13, 17]) slot.palmPos.add(slot.joints[k]);
+  slot.palmPos.multiplyScalar(0.25);
+  if (slot.active && dt > 0) {
+    tmpV.subVectors(slot.palmPos, slot.prevPalm).divideScalar(dt);
+    slot.palmVel.lerp(tmpV, 0.5);
+  } else {
+    slot.palmVel.set(0, 0, 0);
+  }
+  slot.fist = isFist(lm, va);
 
   // Pinch detection with hysteresis.
   const pinchDist =
@@ -143,6 +219,7 @@ function processHand(slot, lm, dt) {
   slot.vis.setVisible(true);
   slot.vis.update(slot.joints, slot.cursor, slot.pinching);
 
+  if (boxingMode) return; // no grabbing in the Boxing tab
   if (slot.pinching && !wasPinching) tryGrab(slot);
   if (!slot.pinching && wasPinching) release(slot, true);
   if (slot.held) moveHeld(slot);
@@ -283,7 +360,8 @@ function frame(now) {
     updateHead(null);
   }
 
-  updateHighlights();
+  if (mode === "boxing") boxing.update(Object.values(slots), dt);
+  else updateHighlights();
   world.step(dt);
   world.render();
 
@@ -309,9 +387,15 @@ window.addEventListener("mousemove", (e) => {
 window.addEventListener("keydown", (e) => {
   if (e.target instanceof HTMLButtonElement) return;
   switch (e.key.toLowerCase()) {
+    case "1":
+      setMode("playground");
+      break;
+    case "2":
+      setMode("boxing");
+      break;
     case "h":
       headEnabled = !headEnabled;
-      $("headState").textContent = headEnabled ? "on" : "off";
+      document.querySelectorAll(".headState").forEach((el) => (el.textContent = headEnabled ? "on" : "off"));
       break;
     case "c":
       headCalib = null; // recalibrates on the next detected face
@@ -322,14 +406,26 @@ window.addEventListener("keydown", (e) => {
       break;
     case " ":
       e.preventDefault();
-      world.spawn();
+      if (mode === "playground") world.spawn();
       break;
     case "r":
+      if (mode === "boxing") {
+        boxing.reset();
+        break;
+      }
       for (const s of Object.values(slots)) release(s, false);
       world.reset();
       break;
   }
 });
+
+document.querySelectorAll("#tabs .tab").forEach((btn) =>
+  btn.addEventListener("click", () => {
+    setMode(btn.dataset.mode);
+    btn.blur(); // keep keyboard shortcuts working after clicking a tab
+  })
+);
+setMode(location.hash.slice(1)); // open straight into #boxing if the link says so
 
 $("startBtn").addEventListener("click", async () => {
   const btn = $("startBtn");
@@ -340,7 +436,9 @@ $("startBtn").addEventListener("click", async () => {
       btn.textContent = s;
     });
     $("start").classList.add("hidden");
-    setStatus("Tracking. Pinch near a shape to grab it.");
+    setStatus(
+      mode === "boxing" ? "Tracking. Punch towards the screen to hit the bag." : "Tracking. Pinch near a shape to grab it."
+    );
   } catch (err) {
     console.error(err);
     const msg =
